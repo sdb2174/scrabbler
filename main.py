@@ -61,7 +61,8 @@ played = []
 
 while len(bag) > 0:
     # player 1 plays; update score:
-    moves = game.find_best_moves(rack1, num = 1)
+    moves = game.find_best_moves(rack1, num = 10)
+    print(moves[0].word, moves[0].score)
     if moves:
         ##################### PLAY ALGORITHM HERE #####################
 

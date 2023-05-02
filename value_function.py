@@ -60,8 +60,7 @@ STEP_SIZE = 1e-3
 def main():
     weights = np.random.rand(FV_WEIGHT_NUM, 1)
 
-    for i in range(1000):
-        print(i)
+    for i in range(100):
         bag = bag_o.copy()
         random.shuffle(bag)
         score1 = 0  # resetting the scores and bag:
@@ -79,7 +78,7 @@ def main():
 
         # And now approximate our value function:
         approx_vf = np.dot(feature_vector, weights)
-        print("V_hat = ", approx_vf)
+        # print("V_hat = ", approx_vf)
 
         while len(bag) > 0:
             moves = game.find_best_moves(rack1, num = 20)
@@ -148,6 +147,7 @@ def vectorize(board, rack, score1, score2):
         for j in range(15):
             if board.square(i, j)._tile:
                 vec.append(ord(board.square(i, j)._tile))
+                print(ord((board.square(i, j)._tile)))
             else:
                 vec.append(0)
 
@@ -158,6 +158,24 @@ def vectorize(board, rack, score1, score2):
     vec.append(score1)
     vec.append(score2)
     return vec
+
+
+def encode(board, rack, move):
+    rows, cols, n = (15, 15, 28)
+    vec = [[[0 for k in range(cols)] for j in range(rows)] for i in range(n)]
+
+
+
+    for i in range(15):
+        for j in range(15):
+            if board.square(i, j)._tile:
+                vec[i][j][0] = 1
+                vec[i][j][ord(board.square(i, j)._tile) - 96 + 1] = 1
+                
+            else:
+                vec[i][j][0] = 0
+                vec[i][j][1] = 0
+
 
 
 def choose_move(moves, game=None, bag=None, played=None):

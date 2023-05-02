@@ -58,6 +58,8 @@ def main():
     moves = game.find_best_moves(rack1, num=100)
     print(policy_gradient(moves, rack1, game, 1, 1, bag, 0, 0))
 
+
+
 #################################################################
 # Function: policy_gradient
 # Inputs:
@@ -74,7 +76,6 @@ def main():
 # Output:
 # theta; the parameterized policy.
 #################################################################
-
 
 def policy_gradient(moves, rack1, game, theta, b, bag, score1, score2):
 
