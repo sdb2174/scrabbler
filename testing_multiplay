@@ -1,0 +1,99 @@
+diff = []
+
+for i in range(1000):
+    print("iter:",i)
+    bag = bag_o.copy()
+    random.shuffle(bag)
+    score1 = 0  # resetting the scores and bag:
+    score2 = 0
+    game = sc.Game(filename="/Users/sbrosh1/Documents/GitHub/scrabbler/games/start_state.p",
+                            global_dictionary=global_dictionary, enable_logger=False)
+    rack1 = []
+    rack2 = []
+    for i in range(RACK_MAX):
+        rack1.append(bag.pop())
+        rack2.append(bag.pop())
+
+    moves = game.find_best_moves(rack1, num = 20)
+    if moves:
+        move = choose_move(moves)
+        game.play(move.start_square, move.word, move.direction)
+        score1 = score1 + move.score
+
+        rack1 = remove_specific_letters(rack1, move.word)
+
+        features = vectorize(rack1, bag)
+            
+        # Draw the number of letters played:
+        for l in range(len(move.word)):
+            rack1.append(bag.pop())
+
+
+        
+    # To reduce variance, play the opponents move multiple times, each sampled from a different rack.
+    # Then, get 10 different targets. Take the average of the targets to get closer to the expected value.
+    # Need to save the bag state, and the board state.
+    term1 = []
+    game.save("i_state")
+    MAX_i = 1
+    for itr in range(MAX_i):
+        print("hits")
+        bag_i = bag.copy()
+        random.shuffle(bag_i)
+        for _ in range(RACK_MAX):
+            rack2.append(bag_i.pop())
+            
+        moves = game.find_best_moves(rack2, num = 1)
+        if moves:
+            game.play(moves[0].start_square, moves[0].word, moves[0].direction)
+            score2 = score2 + moves[0].score
+
+            rack2 = remove_specific_letters(rack2, moves[0].word)
+            for l in range(len(moves[0].word)):
+                rack2.append(bag_i.pop())
+
+
+        # Now, play the next move, and see what the effect of leaving those above tiles has on the scores:
+
+        moves = game.find_best_moves(rack1, num = 1)
+        if moves:
+            move = choose_move(moves)
+            game.play(move.start_square, move.word, move.direction)
+            score1 = score1 + move.score
+            term1.append(move.score)
+            rack1 = remove_specific_letters(rack1, move.word)
+            # Draw the number of letters played:
+            for l in range(len(move.word)):
+                rack1.append(bag_i.pop())
+            # for i in range(len(moves[0].word)):                    
+            #     if len(bag) > 0:
+            #         rack1 = rack1.replace(moves[0].word[i], bag.pop(), 1)
+            #     else:
+            #         rack1 = rack1.replace(moves[0].word[i], '', 1)
+        
+        if itr != MAX_i:
+            game = sc.Game(filename="/Users/sbrosh1/Documents/GitHub/scrabbler/games/i_state.p",
+                            global_dictionary=global_dictionary, enable_logger=False)
+
+
+    # Now, we need to calculate the true value function:
+    # We do this by subtracting the scores from the second play above.
+    # By computing the evaluation function this way, the aim is to see if there is a pattern between leaving certain letters, 
+    # and scoring a higher score in the next move.
+    true_vf = np.average(term1)
+
+    features = np.array(features)
+    with tf.GradientTape() as tape:
+        # Forward pass: compute predicted y using the model
+        predictions = model(features.reshape(1, FV_WEIGHT_NUM))
+        # Compute the loss
+        loss = tf.keras.losses.MeanSquaredError()(true_vf, predictions)
+
+    gradients = tape.gradient(loss, model.trainable_variables)
+
+    diff.append(true_vf - model(features.reshape(1, FV_WEIGHT_NUM)))
+    
+    optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+# np.save(weights)
+print(model.weights)
+

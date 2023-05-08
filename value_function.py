@@ -1,9 +1,10 @@
 RACK_MAX = 7
-FV_WEIGHT_NUM = 234
+FV_WEIGHT_NUM = 26
 
 import random
 import os
 import numpy as np
+import matplotlib.pyplot as plt 
 
 import scrabbler as sc
 from scrabbler.dictionary import Dictionary
@@ -59,105 +60,170 @@ STEP_SIZE = 1e-3
 
 def main():
     weights = np.random.rand(FV_WEIGHT_NUM, 1)
+    diff = []
 
-    for i in range(100):
+    for i in range(1500):
+        print("iter:",i)
         bag = bag_o.copy()
         random.shuffle(bag)
         score1 = 0  # resetting the scores and bag:
         score2 = 0
         game = sc.Game(filename="/Users/sbrosh1/Documents/GitHub/scrabbler/games/start_state.p",
                                 global_dictionary=global_dictionary, enable_logger=False)
-        rack1 = ""
-        rack2 = ""
+        rack1 = []
+        rack2 = []
         for i in range(RACK_MAX):
-            rack1 = rack1 + bag.pop()
-            rack2 = rack2 + bag.pop()
+            rack1.append(bag.pop())
+            rack2.append(bag.pop())
 
-        # First, get our feature vector:
-        feature_vector = vectorize(game.board, rack1, score1, score2)
+        moves = game.find_best_moves(rack1, num = 20)
+        if moves:
+            move = choose_move(moves)
+            game.play(move.start_square, move.word, move.direction)
+            score1 = score1 + move.score
 
-        # And now approximate our value function:
-        approx_vf = np.dot(feature_vector, weights)
-        # print("V_hat = ", approx_vf)
+            rack1 = remove_specific_letters(rack1, move.word)
 
-        while len(bag) > 0:
-            moves = game.find_best_moves(rack1, num = 20)
-            if moves:
-                move = choose_move(moves)
-                game.play(move.start_square, move.word, move.direction)
-                score1 = score1 + move.score
 
-                if len(move.word) == 7:
-                    score1 = score1 + 50
+            # Get feature vector using vectorize function, an approximate the value function.
+            approx_vf = np.dot(vectorize(rack1), weights)
+                
+            # Draw the number of letters played:
+            for l in range(len(move.word)):
+                rack1.append(bag.pop())
 
-                for i in range(len(move.word)):                    
-                    if len(bag) > 0:
-                        rack1 = rack1.replace(move.word[i], bag.pop(), 1)
-                    else:
-                        rack1 = rack1.replace(move.word[i], '', 1)
-
-            else:
-                for l in range(len(rack1)):
-                    if LETTER_VALUE[rack1[l]] > 4:
-                        bag.append(rack1[l])
-                        random.shuffle(bag)
-                        rack1 = rack1.replace(rack1[l], bag.pop(), 1)
+        # If unable to play a move:
+        # else:
+        #     for l in range(len(rack1)):
+        #         if LETTER_VALUE[rack1[l]] > 4:
+        #             bag.append(rack1[l])
+        #             random.shuffle(bag)
+        #             rack1 = rack1.replace(rack1[l], bag.pop(), 1)
             
 
-            moves = game.find_best_moves(rack2, num = 20)
-            if moves:
-                game.play(moves[0].start_square, moves[0].word, moves[0].direction)
-                score2 = score2 + moves[0].score
+        moves = game.find_best_moves(rack2, num = 1)
+        if moves:
+            game.play(moves[0].start_square, moves[0].word, moves[0].direction)
+            score2 = score2 + moves[0].score
 
-                if len(moves[0].word) == 7:
-                    score2 = score2 + 50
+            rack2 = remove_specific_letters(rack2, moves[0].word)
+            for l in range(len(moves[0].word)):
+                rack2.append(bag.pop())
 
-                for i in range(len(moves[0].word)):                    
-                    if len(bag) > 0:
-                        rack2 = rack2.replace(moves[0].word[i], bag.pop(), 1)
-                    else:
-                        rack2 = rack2.replace(moves[0].word[i], '', 1)
+            # for i in range(len(moves[0].word)):                    
+            #     if len(bag) > 0:
+            #         rack2 = rack2.replace(moves[0].word[i], bag.pop(), 1)
+            #     else:
+            #         rack2 = rack2.replace(moves[0].word[i], '', 1)
 
-            else:
-                for l in range(len(rack2)):
-                    if LETTER_VALUE[rack2[l]] > 4:
-                        bag.append(rack2[l])
-                        random.shuffle(bag)
-                        rack2 = rack2.replace(rack2[l], bag.pop(), 1)
+        # else:
+        #     for l in range(len(rack2)):
+        #         if LETTER_VALUE[rack2[l]] > 4:
+        #             bag.append(rack2[l])
+        #             random.shuffle(bag)
+        #             rack2 = rack2.replace(rack2[l], bag.pop(), 1)
 
 
-        if score1 > score2:
-            true_vf = 1
-        if score1 == score2:
-            true_vf = 0.5
-        if score1 < score2:
-            true_vf = 0
+
+        # Now, play the next move, and see what the effect of leaving those above tiles has on the scores:
+
+        moves = game.find_best_moves(rack1, num = 1)
+        if moves:
+            move = choose_move(moves)
+            game.play(move.start_square, move.word, move.direction)
+            score1 = score1 + move.score
+            term1 = move.score
+            rack1 = remove_specific_letters(rack1, move.word)
+            # Draw the number of letters played:
+            for l in range(len(move.word)):
+                rack1.append(bag.pop())
+            # for i in range(len(moves[0].word)):                    
+            #     if len(bag) > 0:
+            #         rack1 = rack1.replace(moves[0].word[i], bag.pop(), 1)
+            #     else:
+            #         rack1 = rack1.replace(moves[0].word[i], '', 1)
+
+        # If unable to play a move:
+        else:
+            for l in range(len(rack1)):
+                if LETTER_VALUE[rack1[l]] > 4:
+                    bag.append(rack1[l])
+                    random.shuffle(bag)
+                    rack1 = rack1.replace(rack1[l], bag.pop(), 1)
+
+
+        # Player 2 plays:
+        moves = game.find_best_moves(rack2, num = 0)
+        if moves:
+            game.play(moves[0].start_square, moves[0].word, moves[0].direction)
+            score2 = score2 + moves[0].score
+            term2 = moves[0].score 
+            rack2 = remove_specific_letters(rack2, moves[0].word)
+            for l in range(len(moves[0].word)):
+                rack2.append(bag.pop())
+
+            # for i in range(len(moves[0].word)):                    
+            #     if len(bag) > 0:
+            #         rack2 = rack2.replace(moves[0].word[i], bag.pop(), 1)
+            #     else:
+            #         rack2 = rack2.replace(moves[0].word[i], '', 1)
+
+        else:
+            for l in range(len(rack2)):
+                if LETTER_VALUE[rack2[l]] > 4:
+                    bag.append(rack2[l])
+                    random.shuffle(bag)
+                    rack2 = rack2.replace(rack2[l], bag.pop(), 1)
+
+
+        # Now, we need to calculate the true value function:
+        # We do this by subtracting the scores from the second play above.
+        # By computing the evaluation function this way, the aim is to see if there is a pattern between leaving certain letters, 
+        # and scoring a higher score in the next move.
+        true_vf = term1
+
+
+        diff.append(true_vf - approx_vf)
         
         delw = STEP_SIZE * (true_vf - approx_vf) * weights 
-        weights = weights + delw 
+        weights = weights + delw # Not experiencing exploding or vanishing gradients after 1500 iterations.
+
+        print(true_vf - approx_vf)
     
     # np.save(weights)
     print(weights)
 
+    # Compute the moving average with window length 50
+    window_length = 50
+    moving_average = np.convolve(diff, np.ones(window_length)/window_length, mode='valid')
 
-def vectorize(board, rack, score1, score2):
+    plt.plot(moving_average)
+    plt.show()
+
+
+def vectorize( rack):
     # First, place the (simplified) board state into the feature vector:
-    vec = []
-    for i in range(15):
-        for j in range(15):
-            if board.square(i, j)._tile:
-                vec.append(ord(board.square(i, j)._tile))
-                print(ord((board.square(i, j)._tile)))
-            else:
-                vec.append(0)
-
+    # vec = []
+    # for i in range(15):
+    #     for j in range(15):
+    #         if board.square(i, j)._tile:
+    #             vec.append(ord(board.square(i, j)._tile))
+    #             print(ord((board.square(i, j)._tile)))
+    #         else:
+    #             vec.append(0)
     # Next, place the entirety of the rack into the feature vector:
-    for i in range(RACK_MAX):
-        vec.append(ord(rack[i]))
+    # for i in range(RACK_MAX):
+    #     vec.append(ord(rack[i]))
 
-    vec.append(score1)
-    vec.append(score2)
-    return vec
+    # vec.append(score1)
+    # vec.append(score2)
+    # return vec
+    vectorized_leave = [0]*26 # Our vectorized version of the leaves which we will update to represent the leaves below
+    for letter in rack:
+        index = ord(letter) - 65
+        vectorized_leave[index] += 1
+
+    return vectorized_leave 
 
 
 def encode(board, rack, move):
@@ -166,8 +232,8 @@ def encode(board, rack, move):
 
 
 
-    for i in range(15):
-        for j in range(15):
+    for i in range(rows):
+        for j in range(cols):
             if board.square(i, j)._tile:
                 vec[i][j][0] = 1
                 vec[i][j][ord(board.square(i, j)._tile) - 96 + 1] = 1
@@ -180,7 +246,7 @@ def encode(board, rack, move):
 
 def choose_move(moves, game=None, bag=None, played=None):
     # start by running an episode for the first move:
-    eps = 0.01
+    eps = 0.75
     r = random.uniform(0, 1)
     if r <= eps:
         move = random.choice(moves)
@@ -189,6 +255,10 @@ def choose_move(moves, game=None, bag=None, played=None):
         move = moves[0]
 
     return move
+
+def remove_specific_letters(arr, letters_to_remove):
+    return [string for string in arr if not any(letter in string for letter in letters_to_remove)]
+
 
 
 if __name__ == "__main__":
